@@ -5,7 +5,7 @@
 #include <sys/time.h>
 
 #define HASHTABLE_SIZE 1000099
-#define LOCALBUFFER_SIZE 1000
+#define LOCALBUFFER_SIZE 100
 
 /* node structure for heap */
 typedef struct node {
@@ -243,7 +243,6 @@ char * read_input() {
 void * tree_search(void * i) {
 
 	int * id = (int *) i;
-	printf("%d\n", *id);
 	node local_heap[LOCALBUFFER_SIZE];
 	node * local_ht[LOCALBUFFER_SIZE];
 	for(int i = 0; i < LOCALBUFFER_SIZE; i++)
@@ -251,15 +250,19 @@ void * tree_search(void * i) {
 	int local_heap_size = 0;
 	node min_dist_node;
 
-	while(!found_solution) {
+	while(1) {
 		/* getting lock on working queue and after taking he minimum distance orientation, instantaneously release the lock */
 		
 		if(local_heap_size == 0) {
 			/* no local heap, so we have to get the lock and get the minimum element */
 			pthread_mutex_lock(&working_queue_lock);
 			if(heap_size == 0) {
+				if(found_solution) {
+					pthread_mutex_unlock(&working_queue_lock);
+					break;
+				}
 				pthread_mutex_unlock(&working_queue_lock);
-				printf("Thread: %d continued\n", *id);
+				// printf("Thread: %d continued\n", *id);
 				continue;
 			}
 			min_dist_node = extract_heap_min(heap, &heap_size);
@@ -267,6 +270,10 @@ void * tree_search(void * i) {
 		}
 		else if(local_heap_size == LOCALBUFFER_SIZE) {
 			pthread_mutex_lock(&working_queue_lock);
+			if(found_solution) {
+				pthread_mutex_unlock(&working_queue_lock);
+				break;
+			}
 			for(int i = 0; i < LOCALBUFFER_SIZE; i++) {
 				if(!find_in_ht(hash_table, local_heap[i].str, HASHTABLE_SIZE)) {
 					insert_heap_node(local_heap[i], heap, &heap_size);
@@ -283,6 +290,10 @@ void * tree_search(void * i) {
 				min_dist_node = extract_heap_min(local_heap, &local_heap_size);
 			}
 			else {
+				if(found_solution) {
+					pthread_mutex_unlock(&working_queue_lock);
+					break;
+				}
 				for(int i = 0; i < local_heap_size; i++) {
 					if(!find_in_ht(hash_table, local_heap[i].str, HASHTABLE_SIZE)) {
 						insert_heap_node(local_heap[i], heap, &heap_size);
@@ -297,7 +308,7 @@ void * tree_search(void * i) {
 		
 		printf("Thread: %d, orientation: %s, dist: %d\n", *id, min_dist_node.str, min_dist_node.dist);
 		
-		if(found_solution)
+		if(found_solution) 
 			break;
 
 		if(min_dist_node.dist == 0) {
@@ -336,7 +347,7 @@ void * tree_search(void * i) {
 			moves[strlen(min_dist_node.moves) + 1] = '\0';
 			moves[strlen(min_dist_node.moves)] = 'U';
 			node new = get_heap_node(tmp, moves, min_dist_node.max_moves);
-			if(local_heap_size < LOCALBUFFER_SIZE - 1 && !find_in_ht(hash_table, new.str, HASHTABLE_SIZE) && !find_in_ht(local_ht, new.str, LOCALBUFFER_SIZE)) {
+			if(local_heap_size < LOCALBUFFER_SIZE - 1 && !find_in_ht(local_ht, new.str, LOCALBUFFER_SIZE)) {
 				insert_heap_node(new, local_heap, &local_heap_size);
 				insert_in_ht(local_ht, new.str, LOCALBUFFER_SIZE);
 			}
@@ -351,7 +362,7 @@ void * tree_search(void * i) {
 			moves[strlen(min_dist_node.moves) + 1] = '\0';
 			moves[strlen(min_dist_node.moves)] = 'D';
 			node new = get_heap_node(tmp, moves, min_dist_node.max_moves);
-			if(local_heap_size < LOCALBUFFER_SIZE - 1 && !find_in_ht(hash_table, new.str, HASHTABLE_SIZE) && !find_in_ht(local_ht, new.str, LOCALBUFFER_SIZE)) {
+			if(local_heap_size < LOCALBUFFER_SIZE - 1 && !find_in_ht(local_ht, new.str, LOCALBUFFER_SIZE)) {
 				insert_heap_node(new, local_heap, &local_heap_size);
 				insert_in_ht(local_ht, new.str, LOCALBUFFER_SIZE);
 			}
@@ -366,7 +377,7 @@ void * tree_search(void * i) {
 			moves[strlen(min_dist_node.moves) + 1] = '\0';
 			moves[strlen(min_dist_node.moves)] = 'L';
 			node new = get_heap_node(tmp, moves, min_dist_node.max_moves);
-			if(local_heap_size < LOCALBUFFER_SIZE - 1 && !find_in_ht(hash_table, new.str, HASHTABLE_SIZE) && !find_in_ht(local_ht, new.str, LOCALBUFFER_SIZE)) {
+			if(local_heap_size < LOCALBUFFER_SIZE - 1 && !find_in_ht(local_ht, new.str, LOCALBUFFER_SIZE)) {
 				insert_heap_node(new, local_heap, &local_heap_size);
 				insert_in_ht(local_ht, new.str, LOCALBUFFER_SIZE);
 			}	
@@ -381,12 +392,13 @@ void * tree_search(void * i) {
 			moves[strlen(min_dist_node.moves) + 1] = '\0';
 			moves[strlen(min_dist_node.moves)] = 'R';
 			node new = get_heap_node(tmp, moves, min_dist_node.max_moves);
-			if(local_heap_size < LOCALBUFFER_SIZE - 1 && !find_in_ht(hash_table, new.str, HASHTABLE_SIZE) && !find_in_ht(local_ht, new.str, LOCALBUFFER_SIZE)) {
+			if(local_heap_size < LOCALBUFFER_SIZE - 1 && !find_in_ht(local_ht, new.str, LOCALBUFFER_SIZE)) {
 				insert_heap_node(new, local_heap, &local_heap_size);
 				insert_in_ht(local_ht, new.str, LOCALBUFFER_SIZE);
 			}
 		}
 	}
+	printf("%d\n", *id);
 }
 
 int main(int argc, char ** argv) {
