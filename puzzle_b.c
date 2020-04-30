@@ -5,8 +5,8 @@
 #include <sys/time.h>
 
 #define HASHTABLE_SIZE 1000099
-#define LOCALBUFFER_SIZE 50
-#define NUM_OPENLISTS 4
+#define LOCALBUFFER_SIZE 20
+#define NUM_OPENLISTS 10
 
 /* node structure for heap */
 typedef struct node {
@@ -23,7 +23,7 @@ typedef struct node {
 } node;
 
 /* stores heap for the work queue */
-node heap[1000000][NUM_OPENLISTS];
+node heap[1000005][NUM_OPENLISTS];
 
 /* it shores the hash table of orientation in chained format */
 node * hash_table[HASHTABLE_SIZE];
@@ -274,9 +274,6 @@ void * tree_search(void * i) {
 		}
 		else if(local_heap_size == LOCALBUFFER_SIZE) {
 			int wq_id = (rand() % NUM_OPENLISTS);
-			if(found_solution) {
-				break;
-			}
 			pthread_mutex_lock(&hashtable_lock);
 			if(found_solution) {
 				pthread_mutex_unlock(&hashtable_lock);
@@ -286,7 +283,7 @@ void * tree_search(void * i) {
 				if(!find_in_ht(hash_table, local_heap[i].str, HASHTABLE_SIZE)) {
 					int wq_tmp = (rand() % NUM_OPENLISTS);
 					pthread_mutex_lock(&working_queue_lock[wq_tmp]);
-					insert_heap_node(local_heap[i], heap[wq_id], &heap_size[wq_id]);
+					insert_heap_node(local_heap[i], heap[wq_tmp], &heap_size[wq_tmp]);
 					pthread_mutex_unlock(&working_queue_lock[wq_tmp]);
 					insert_in_ht(hash_table, local_heap[i].str, HASHTABLE_SIZE);
 				}
@@ -322,7 +319,7 @@ void * tree_search(void * i) {
 					if(!find_in_ht(hash_table, local_heap[i].str, HASHTABLE_SIZE)) {
 						int wq_tmp = (rand() % NUM_OPENLISTS);
 						pthread_mutex_lock(&working_queue_lock[wq_tmp]);
-						insert_heap_node(local_heap[i], heap[wq_id], &heap_size[wq_id]);
+						insert_heap_node(local_heap[i], heap[wq_tmp], &heap_size[wq_tmp]);
 						pthread_mutex_unlock(&working_queue_lock[wq_tmp]);
 						insert_in_ht(hash_table, local_heap[i].str, HASHTABLE_SIZE);
 					}
@@ -344,7 +341,6 @@ void * tree_search(void * i) {
 			break;
 		
 		printf("Thread: %d, orientation: %s, dist: %d\n", *id, min_dist_node.str, min_dist_node.dist);
-
 		if(min_dist_node.dist == 0) {
 			found_solution = 1;
 			printf("The solution is: %s\n", min_dist_node.moves);
@@ -367,7 +363,6 @@ void * tree_search(void * i) {
 		int moves_done = strlen(min_dist_node.moves);
 		if(moves_done + 1 > min_dist_node.max_moves) {
 			min_dist_node.max_moves *= 2;
-			// min_dist_node.moves = (char *)realloc(min_dist_node.moves_done, min_dist_node.max_moves);
 		}
 
 		/* moving appropriately */
@@ -446,7 +441,6 @@ int main(int argc, char ** argv) {
 	/* taking the input orientation of the puzzle and inserting it into the work queue and hash table */
 	char start[17];
 	strcpy(start, read_input());
-	// printf("%s\n", start);
 	if(!is_solvable(start)) {
 		printf("The given puzzle is unsolvable\n");
 		return 0;

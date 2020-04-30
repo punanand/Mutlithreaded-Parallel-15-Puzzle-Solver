@@ -5,7 +5,7 @@
 #include <sys/time.h>
 
 #define HASHTABLE_SIZE 1000099
-#define LOCALBUFFER_SIZE 50
+#define LOCALBUFFER_SIZE 20
 
 /* node structure for heap */
 typedef struct node {
