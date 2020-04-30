@@ -255,6 +255,7 @@ void * tree_search(void * i) {
 		printf("Error in setting state\n");
 
 	int * id = (int *) i;
+	int num_threads = nthreads;
 	node local_heap[LOCALBUFFER_SIZE];
 	node * local_ht[LOCALBUFFER_SIZE];
 	for(int i = 0; i < LOCALBUFFER_SIZE; i++)
@@ -274,7 +275,6 @@ void * tree_search(void * i) {
 					return NULL;
 				}
 				pthread_mutex_unlock(&working_queue_lock);
-				// printf("Thread: %d continued\n", *id);
 				continue;
 			}
 			if(found_solution) {
@@ -286,10 +286,6 @@ void * tree_search(void * i) {
 		}
 		else if(local_heap_size == LOCALBUFFER_SIZE) {
 			pthread_mutex_lock(&working_queue_lock);
-			// if(found_solution) {
-			// 	pthread_mutex_unlock(&working_queue_lock);
-			// 	break;
-			// }
 			for(int i = 0; i < LOCALBUFFER_SIZE; i++) {
 				if(!find_in_ht(hash_table, local_heap[i].str, HASHTABLE_SIZE)) {
 					insert_heap_node(local_heap[i], heap, &heap_size);
@@ -306,10 +302,6 @@ void * tree_search(void * i) {
 				min_dist_node = extract_heap_min(local_heap, &local_heap_size);
 			}
 			else {
-				// if(found_solution) {
-				// 	pthread_mutex_unlock(&working_queue_lock);
-				// 	break;
-				// }
 				for(int i = 0; i < local_heap_size; i++) {
 					if(!find_in_ht(hash_table, local_heap[i].str, HASHTABLE_SIZE)) {
 						insert_heap_node(local_heap[i], heap, &heap_size);
@@ -317,24 +309,12 @@ void * tree_search(void * i) {
 					}
 				}
 				min_dist_node = extract_heap_min(heap, &heap_size);
-				// if(found_solution) {
-				// 	pthread_mutex_unlock(&working_queue_lock);
-				// 	break;
-				// }
 				pthread_mutex_unlock(&working_queue_lock);
 				local_heap_size = 0;
 			}
 		}
-		
-		printf("Thread: %d, orientation: %s, dist: %d\n", *id, min_dist_node.str, min_dist_node.dist);
 
-		// pthread_mutex_lock(&working_queue_lock);
-		// printf("Thread %d %d\n", *id, found_solution);
-		// if(found_solution) {
-		// 	pthread_mutex_unlock(&working_queue_lock);
-		// 	break;
-		// }
-		// pthread_mutex_unlock(&working_queue_lock);
+		pthread_testcancel();
 
 		if(min_dist_node.dist == 0) {
 			pthread_mutex_lock(&working_queue_lock);
@@ -344,15 +324,12 @@ void * tree_search(void * i) {
 			}
 			found_solution = 1;
 			int j;
-			printf("nthreads: %d\n", nthreads);
-			for(j = 0; j < nthreads; j++) {
+			for(j = 0; j < num_threads; j++) {
 				if(j != *id) {
-					printf("%d\n", j);
 					pthread_cancel(thread_id[j]);
 				}
 			}
 			pthread_mutex_unlock(&working_queue_lock);
-			printf("Threadddddd %d\n", *id);
 			printf("The solution is: %s\n", min_dist_node.moves);
 			break;
 		}
@@ -373,7 +350,6 @@ void * tree_search(void * i) {
 		int moves_done = strlen(min_dist_node.moves);
 		if(moves_done + 1 > min_dist_node.max_moves) {
 			min_dist_node.max_moves *= 2;
-			// min_dist_node.moves = (char *)realloc(min_dist_node.moves_done, min_dist_node.max_moves);
 		}
 
 		/* moving appropriately */
@@ -451,7 +427,6 @@ int main(int argc, char ** argv) {
 	/* taking the input orientation of the puzzle and inserting it into the work queue and hash table */
 	char start[17];
 	strcpy(start, read_input());
-	// printf("%s\n", start);
 	if(!is_solvable(start)) {
 		printf("The given puzzle is unsolvable\n");
 		return 0;

@@ -7,6 +7,7 @@
 #define HASHTABLE_SIZE 1000099
 #define LOCALBUFFER_SIZE 20
 #define NUM_OPENLISTS 10
+#define MAX_THREADS 1000
 
 /* node structure for heap */
 typedef struct node {
@@ -40,9 +41,17 @@ pthread_mutex_t working_queue_lock[NUM_OPENLISTS];
 /* mutex lock for accessing the hash table */
 pthread_mutex_t hashtable_lock;
 
+/* mutex loc for accessing found_solution */
+pthread_mutex_t solution_found_lock;
+
 /* flag that will be set if any of the threads find the solution */
 int found_solution;
 
+/* the threads defined globally */
+pthread_t thread_id[MAX_THREADS];
+
+/* arguments are thread numbers starting from 0(for easy recognition of threads) */
+int argument[MAX_THREADS];
 
 /**
  * @param a 	orientation of the 15 square in string format.
@@ -245,8 +254,15 @@ char * read_input() {
 
 /* the tree search function where each thread begins its execution */
 void * tree_search(void * i) {
+	
+	// pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
+	int tmp = pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+	if(tmp != 0)
+		printf("Error in setting state\n");
 
 	int * id = (int *) i;
+	int num_threads = nthreads;
+	
 	node local_heap[LOCALBUFFER_SIZE];
 	node * local_ht[LOCALBUFFER_SIZE];
 	for(int i = 0; i < LOCALBUFFER_SIZE; i++)
@@ -255,30 +271,37 @@ void * tree_search(void * i) {
 	node min_dist_node;
 
 	while(1) {
+		
+		pthread_testcancel();
 		/* getting lock on working queue and after taking he minimum distance orientation, instantaneously release the lock */
 		if(local_heap_size == 0) {
 			/* no local heap, so we have to get the lock and get the minimum element */
 			int wq_id = (rand() % NUM_OPENLISTS);
 			pthread_mutex_lock(&working_queue_lock[wq_id]);
 			if(heap_size[wq_id] == 0) {
+				pthread_mutex_lock(&solution_found_lock);
 				if(found_solution) {
 					pthread_mutex_unlock(&working_queue_lock[wq_id]);
-					break;
+					pthread_mutex_unlock(&solution_found_lock);
+					return NULL;
 				}
+				pthread_mutex_unlock(&solution_found_lock);
 				pthread_mutex_unlock(&working_queue_lock[wq_id]);
-				// printf("Thread: %d continued\n", *id);
 				continue;
 			}
+			pthread_mutex_lock(&solution_found_lock);
+			if(found_solution) {
+				pthread_mutex_unlock(&working_queue_lock[wq_id]);
+				pthread_mutex_unlock(&solution_found_lock);
+				return NULL;
+			}
+			pthread_mutex_unlock(&solution_found_lock);
 			min_dist_node = extract_heap_min(heap[wq_id], &heap_size[wq_id]);
 			pthread_mutex_unlock(&working_queue_lock[wq_id]);
 		}
 		else if(local_heap_size == LOCALBUFFER_SIZE) {
 			int wq_id = (rand() % NUM_OPENLISTS);
 			pthread_mutex_lock(&hashtable_lock);
-			if(found_solution) {
-				pthread_mutex_unlock(&hashtable_lock);
-				break;
-			}
 			for(int i = 0; i < LOCALBUFFER_SIZE; i++) {
 				if(!find_in_ht(hash_table, local_heap[i].str, HASHTABLE_SIZE)) {
 					int wq_tmp = (rand() % NUM_OPENLISTS);
@@ -292,13 +315,9 @@ void * tree_search(void * i) {
 			local_heap_size = 0;
 
 			int wq_id2 = (rand() % NUM_OPENLISTS);
-			if(found_solution) {
-				break;
-			}
 			pthread_mutex_lock(&working_queue_lock[wq_id2]);
 			if(heap_size[wq_id2] == 0) {
 				pthread_mutex_unlock(&working_queue_lock[wq_id2]);
-				// printf("Thread: %d continued\n", *id);
 				continue;
 			}
 			min_dist_node = extract_heap_min(heap[wq_id2], &heap_size[wq_id2]);
@@ -311,10 +330,6 @@ void * tree_search(void * i) {
 				min_dist_node = extract_heap_min(local_heap, &local_heap_size);
 			}
 			else {
-				if(found_solution) {
-					pthread_mutex_unlock(&hashtable_lock);
-					break;
-				}
 				for(int i = 0; i < local_heap_size; i++) {
 					if(!find_in_ht(hash_table, local_heap[i].str, HASHTABLE_SIZE)) {
 						int wq_tmp = (rand() % NUM_OPENLISTS);
@@ -337,13 +352,25 @@ void * tree_search(void * i) {
 			}
 		}
 
-		if(found_solution)
-			break;
+		pthread_testcancel();
 		
-		printf("Thread: %d, orientation: %s, dist: %d\n", *id, min_dist_node.str, min_dist_node.dist);
 		if(min_dist_node.dist == 0) {
+			pthread_testcancel();
+			pthread_mutex_lock(&solution_found_lock);
+			if(found_solution) {
+				pthread_mutex_unlock(&solution_found_lock);
+				return NULL;
+			}
+			pthread_testcancel();
 			found_solution = 1;
+			int j;
+			for(j = 0; j < num_threads; j++) {
+				if(j != *id) {
+					pthread_cancel(thread_id[j]);
+				}
+			}
 			printf("The solution is: %s\n", min_dist_node.moves);
+			pthread_mutex_unlock(&solution_found_lock);
 			break;
 		}
 
@@ -453,11 +480,12 @@ int main(int argc, char ** argv) {
 	for(int i = 0; i < NUM_OPENLISTS; i++)
 		pthread_mutex_init(&working_queue_lock[i], NULL);
 	pthread_mutex_init(&hashtable_lock, NULL);
+	pthread_mutex_init(&solution_found_lock, NULL);
 
 	/* creating the threads */
-	pthread_t thread_id[nthreads];
+	
 	int i;
-	int argument[nthreads];
+	
 	for(i = 0; i < nthreads; i++) {
 		argument[i] = i;
 		pthread_create(&thread_id[i], NULL, tree_search, (void *) &argument[i]);
