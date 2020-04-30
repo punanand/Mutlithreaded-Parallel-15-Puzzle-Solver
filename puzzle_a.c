@@ -316,6 +316,8 @@ void * tree_search(void * i) {
 
 		pthread_testcancel();
 
+		// printf("Thread:%d orientation: %s\n", *id, min_dist_node.str);
+
 		if(min_dist_node.dist == 0) {
 			pthread_mutex_lock(&working_queue_lock);
 			if(found_solution) {
