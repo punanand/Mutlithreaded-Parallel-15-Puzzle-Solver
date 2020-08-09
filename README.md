@@ -61,3 +61,7 @@ Instead of using a single work queue, we declare multiple work queues and the th
 #### Implementation (only the modifications):
 - Instead of using a single global heap, we declare an array of structures of size `NUM_OPENLISTS`, declared as a macro in `puzzle_b.c`, and therefore declared an array of mutex corresponding to each of the mutex.
 - Whenever we extract the minimum distance node or insert anything into the heap, we randomly generate an index and acquire lock on the corresponding mutex.
+
+## Analysis of the algorithm:
+The study of the performance of the algorithm is done in the file [Plots&Data](https://github.com/punanand/Mutlithreaded-Parallel-15-Puzzle-Solver/blob/master/Plots%26Data.pdf). The key observations and trends are also analyzed along with.
+
